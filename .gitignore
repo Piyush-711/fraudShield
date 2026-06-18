@@ -86,3 +86,12 @@ coverage/
 *.lcov
 htmlcov/
 .coverage
+
+# ─── DOCUMENTATION (Exclude raw MD docs, keep README.md) ──────────────────────
+1_PRD.md
+2_TRD.md
+3_APP_FLOW.md
+4_UI_UX_DESIGN_BRIEF.md
+5_BACKEND_SCHEMA.md
+6_IMPLEMENTATION_PLAN.md
+
