@@ -1,0 +1,88 @@
+# ============================================================
+#  FraudShield — .gitignore
+#  Prevents secrets, build artifacts, and IDE files from
+#  being committed to version control.
+# ============================================================
+
+# ─── SECRET / ENVIRONMENT FILES ──────────────────────────────────────────────
+.env
+*.env
+!.env.example          # always allow the example template
+**/secrets.yml
+**/secrets.yaml
+**/application-prod.yml
+**/application-local.yml
+
+# ─── JAVA / MAVEN (fraudshield-backend) ──────────────────────────────────────
+fraudshield-backend/target/
+fraudshield-backend/.mvn/
+fraudshield-backend/*.log
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+
+# ─── NODE / NEXT.JS (fraudshield-frontend) ────────────────────────────────────
+fraudshield-frontend/node_modules/
+fraudshield-frontend/.next/
+fraudshield-frontend/out/
+fraudshield-frontend/.cache/
+fraudshield-frontend/dist/
+fraudshield-frontend/*.tsbuildinfo
+fraudshield-frontend/tsconfig.tsbuildinfo
+
+# ─── PYTHON / ML SERVICE (fraudshield-ml) ────────────────────────────────────
+fraudshield-ml/__pycache__/
+fraudshield-ml/**/__pycache__/
+fraudshield-ml/*.pyc
+fraudshield-ml/**/*.pyc
+fraudshield-ml/*.egg-info/
+fraudshield-ml/dist/
+fraudshield-ml/build/
+fraudshield-ml/.venv/
+fraudshield-ml/venv/
+fraudshield-ml/env/
+fraudshield-ml/.pytest_cache/
+fraudshield-ml/app/model/*.pkl    # trained model files (can be large/private)
+fraudshield-ml/app/model/*.joblib
+
+# ─── DOCKER ───────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ─── DATABASES ───────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+*.h2.db
+*.mv.db
+
+# ─── LOGS ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+*.log.*
+
+# ─── OS FILES ─────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── IDE / EDITOR ────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+*~
+
+# ─── COVERAGE / TESTS ────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+*.lcov
+htmlcov/
+.coverage
