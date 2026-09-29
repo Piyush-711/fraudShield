@@ -72,7 +72,7 @@ export default function ReviewPage() {
             </strong>
           </p>
           <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-100">
-            "{reason}"
+            &ldquo;{reason}&rdquo;
           </p>
           <p className="text-[11px] text-slate-400">Redirecting to transactions feed in 2s...</p>
           <Link href="/dashboard/transactions" className="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-colors">
