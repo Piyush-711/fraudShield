@@ -49,8 +49,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [alertCount] = useState(3);
   const [time, setTime] = useState(new Date());
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const token = localStorage.getItem('fraudshield_token');
     if (!token) {
       router.push('/auth/login');
@@ -141,12 +143,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Live Clock */}
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-600 font-medium bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200/60">
             <Clock className="w-3.5 h-3.5 text-slate-600" />
-            <span>
-              {time.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              })}
+            <span suppressHydrationWarning>
+              {mounted
+                ? time.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  })
+                : '--:--:--'}
             </span>
           </div>
 

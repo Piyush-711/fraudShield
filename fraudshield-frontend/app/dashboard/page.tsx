@@ -343,7 +343,9 @@ export default function DashboardPage() {
           </h1>
           <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 font-medium">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
-            Last synced at {lastUpdated.toLocaleTimeString()} · Auto-refreshes every 10 seconds
+            <span>Last synced at </span>
+            <span suppressHydrationWarning>{lastUpdated.toLocaleTimeString()}</span>
+            <span> · Auto-refreshes every 10 seconds</span>
           </p>
         </div>
 
