@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { fetchUsers, createUser } from '@/lib/api';
+import { fetchUsers, createUser, toggleUserStatus } from '@/lib/api';
 import { User, UserRole } from '@/lib/types';
 
 const roleConfig: Record<UserRole, { color:string; bg:string; label:string }> = {
@@ -59,9 +59,14 @@ export default function UsersPage() {
     }
   };
 
-  const handleToggleActive = (id: number) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, isActive: !u.isActive } : u));
-    showToast('User status updated');
+  const handleToggleActive = async (id: number) => {
+    try {
+      const updated = await toggleUserStatus(id);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, isActive: updated.isActive } : u));
+      showToast(`User status updated to ${updated.isActive ? 'Active' : 'Inactive'}`);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update user status', true);
+    }
   };
 
   const inputStyle = { width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid #D1D5DB', fontSize:14, outline:'none', boxSizing:'border-box' as const };

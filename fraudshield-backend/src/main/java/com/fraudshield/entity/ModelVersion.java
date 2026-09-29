@@ -40,12 +40,15 @@ public class ModelVersion {
 
     // Status
     @Column(name = "is_active")
+    @Builder.Default
     private Boolean isActive = false;
 
     @Column(name = "is_canary")
+    @Builder.Default
     private Boolean isCanary = false;
 
     @Column(name = "canary_percentage")
+    @Builder.Default
     private Integer canaryPercentage = 0;
 
     // Metadata

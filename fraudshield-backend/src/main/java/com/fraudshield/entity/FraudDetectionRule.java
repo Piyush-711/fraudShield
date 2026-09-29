@@ -29,27 +29,34 @@ public class FraudDetectionRule {
     private String ruleAction; // AUTO_APPROVE, AUTO_REJECT, FLAG_FOR_REVIEW
 
     @Column(nullable = false)
+    @Builder.Default
     private Integer priority = 100;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean enabled = true;
 
     @Column(name = "is_system_rule")
+    @Builder.Default
     private Boolean isSystemRule = false;
 
     @Column(name = "risk_score_impact")
+    @Builder.Default
     private Double riskScoreImpact = 0.0;
 
     @Column(name = "confidence_weight")
+    @Builder.Default
     private Double confidenceWeight = 1.0;
 
     @Column(name = "execution_timeout_ms")
+    @Builder.Default
     private Integer executionTimeoutMs = 100;
 
     @Column(name = "last_triggered_at")
     private LocalDateTime lastTriggeredAt;
 
     @Column(name = "times_triggered")
+    @Builder.Default
     private Integer timesTriggered = 0;
 
     @Column(name = "created_at")

@@ -20,6 +20,8 @@ from app.services.ml_service import load_model, predict
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("fraudshield.main")
 
+ENABLE_KAFKA = os.getenv("ENABLE_KAFKA", "true").lower() in ("true", "1", "yes")
+
 # ─── Startup / Shutdown ───────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,8 +30,28 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, load_model)
     logger.info("✅ ML Service ready")
+
+    kafka_task = None
+    if ENABLE_KAFKA:
+        try:
+            from app.kafka.stream_consumer import start_kafka_consumer
+            kafka_task = asyncio.create_task(start_kafka_consumer(), name="kafka-stream-consumer")
+            logger.info("🎧 Kafka background stream consumer task launched")
+        except Exception as e:
+            logger.warning("Could not launch Kafka consumer task: %s", e)
+
     yield
-    logger.info("👋 Shutting down ML Service")
+
+    logger.info("👋 Shutting down ML Service...")
+    if kafka_task and not kafka_task.done():
+        logger.info("Cancelling Kafka consumer task...")
+        kafka_task.cancel()
+        try:
+            await kafka_task
+        except asyncio.CancelledError:
+            pass
+    logger.info("👋 Shutdown complete")
+
 
 
 # ─── App ─────────────────────────────────────────────────────────────────────

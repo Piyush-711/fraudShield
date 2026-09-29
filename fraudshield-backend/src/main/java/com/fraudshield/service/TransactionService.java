@@ -23,6 +23,12 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fraudshield.entity.FraudDetectionRule;
+import com.fraudshield.entity.SystemConfig;
+import com.fraudshield.repository.FraudDetectionRuleRepository;
+import com.fraudshield.repository.SystemConfigRepository;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -30,8 +36,10 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepo;
     private final AuditLogRepository auditLogRepo;
+    private final SystemConfigRepository configRepo;
+    private final FraudDetectionRuleRepository ruleRepo;
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final RestTemplate restTemplate = new RestTemplate();
 
     // Optional beans — only present in prod profile
     @Autowired(required = false)
@@ -39,7 +47,6 @@ public class TransactionService {
 
     @Value("${fraudshield.ml.service-url:http://localhost:8000}")
     private String mlServiceUrl;
-
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -228,6 +235,93 @@ public class TransactionService {
         }
     }
 
+    private record RuleEvalResult(int adjustedScore, boolean forceReject, boolean forceReview, List<RiskFactor> updatedFactors) {}
+
+    private RuleEvalResult evaluateRules(EvaluateTransactionReq req, int baseScore, List<RiskFactor> mlFactors) {
+        List<FraudDetectionRule> rules;
+        try {
+            rules = ruleRepo.findByEnabledTrueOrderByPriorityDesc();
+        } catch (Exception e) {
+            log.warn("Failed to fetch fraud detection rules: {}", e.getMessage());
+            return new RuleEvalResult(baseScore, false, false, mlFactors);
+        }
+
+        if (rules == null || rules.isEmpty()) {
+            return new RuleEvalResult(baseScore, false, false, mlFactors);
+        }
+
+        double score = baseScore;
+        boolean forceReject = false;
+        boolean forceReview = false;
+        List<RiskFactor> factors = new ArrayList<>(mlFactors);
+
+        for (FraudDetectionRule rule : rules) {
+            try {
+                if (rule.getRuleCondition() == null || rule.getRuleCondition().isBlank()) continue;
+                JsonNode conditionNode = objectMapper.readTree(rule.getRuleCondition());
+                String field = conditionNode.path("field").asText("");
+                String op = conditionNode.path("operator").asText("");
+                JsonNode valNode = conditionNode.path("value");
+
+                boolean matched = false;
+                switch (field) {
+                    case "amount" -> {
+                        if (req.getAmount() != null) {
+                            double amount = req.getAmount().doubleValue();
+                            double target = valNode.asDouble();
+                            matched = "greater_than".equalsIgnoreCase(op) && amount > target;
+                        }
+                    }
+                    case "merchant_category" -> {
+                        if (req.getMerchantCategory() != null) {
+                            String target = valNode.asText();
+                            matched = "equals".equalsIgnoreCase(op) && req.getMerchantCategory().equalsIgnoreCase(target);
+                        }
+                    }
+                    case "location_country" -> {
+                        if (req.getLocationCountry() != null) {
+                            if ("not_in".equalsIgnoreCase(op) && valNode.isArray()) {
+                                List<String> countries = new ArrayList<>();
+                                valNode.forEach(n -> countries.add(n.asText().toUpperCase()));
+                                matched = !countries.contains(req.getLocationCountry().toUpperCase());
+                            } else if ("not_equals".equalsIgnoreCase(op)) {
+                                matched = !req.getLocationCountry().equalsIgnoreCase(valNode.asText());
+                            }
+                        }
+                    }
+                    case "transaction_count_1h" -> {
+                        if (req.getUserId() != null) {
+                            long count1h = transactionRepo.countByUserIdAndCreatedAtAfter(req.getUserId(), LocalDateTime.now().minusHours(1));
+                            matched = "greater_than".equalsIgnoreCase(op) && count1h > valNode.asLong();
+                        }
+                    }
+                }
+
+                if (matched) {
+                    double impact = rule.getRiskScoreImpact() != null ? rule.getRiskScoreImpact() : 0.0;
+                    score += impact;
+                    factors.add(RiskFactor.builder()
+                        .factor("rule_" + rule.getName().toLowerCase().replace(' ', '_'))
+                        .weight(Math.round(impact / 100.0 * 100.0) / 100.0)
+                        .explanation("Triggered rule: " + rule.getName() + " (" + rule.getDescription() + ")")
+                        .build());
+
+                    String action = rule.getRuleAction();
+                    if ("BLOCK".equalsIgnoreCase(action) || "REJECT".equalsIgnoreCase(action)) {
+                        forceReject = true;
+                    } else if ("FLAG_FOR_REVIEW".equalsIgnoreCase(action)) {
+                        forceReview = true;
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Failed to evaluate rule {}: {}", rule.getName(), ex.getMessage());
+            }
+        }
+
+        int finalScore = Math.min(100, Math.max(0, (int) Math.round(score)));
+        return new RuleEvalResult(finalScore, forceReject, forceReview, factors);
+    }
+
     @Transactional
     public ApiResponse<TransactionDto> evaluateTransaction(EvaluateTransactionReq req) {
         long startMs = System.currentTimeMillis();
@@ -239,27 +333,37 @@ public class TransactionService {
             return ApiResponse.ok(toDtoWithAudit(existing.get()));
         }
 
-        // Simulate ML scoring (random 0-100; in production this calls the ML service)
-        int fraudScore = simulateFraudScore(req);
-        int confidence  = Math.min(99, fraudScore + (int)(Math.random() * 6));
-        String prediction = fraudScore > 50 ? "REJECT" : "APPROVE";
+        // Call ML service with full explainability or heuristic fallback
+        MlPredictionResult mlResult = getMlPrediction(req);
+        int fraudScore = mlResult.score();
+        int confidence = mlResult.confidence();
+        String prediction = mlResult.prediction();
+        String modelVersion = mlResult.modelVersion();
+        String factorsJson = mlResult.factorsJson();
 
-        // Decision engine thresholds (from PRD section 5.2)
-        String finalDecision;
-        String status;
-        if (fraudScore < 20) {
-            finalDecision = "APPROVED"; status = "APPROVED";
-        } else if (fraudScore >= 85) {
-            finalDecision = "REJECTED"; status = "REJECTED";
-        } else {
-            finalDecision = null; status = "MANUAL_REVIEW";
+        // Decision engine dynamic thresholds from SystemConfig
+        SystemConfig config = configRepo.findAll().stream().findFirst().orElse(null);
+        int autoApproval = (config != null && config.getAutoApprovalThreshold() != null) ? config.getAutoApprovalThreshold() : 20;
+        int autoRejection = (config != null && config.getAutoRejectionThreshold() != null) ? config.getAutoRejectionThreshold() : 85;
+
+        // Evaluate dynamic fraud detection rules
+        RuleEvalResult ruleResult = evaluateRules(req, fraudScore, parseFraudFactors(factorsJson));
+        fraudScore = ruleResult.adjustedScore();
+        try {
+            factorsJson = objectMapper.writeValueAsString(ruleResult.updatedFactors());
+        } catch (Exception e) {
+            log.warn("Failed to serialize updated factors: {}", e.getMessage());
         }
 
-        // Build risk factors
-        List<Map<String, Object>> factorsList = buildSimulatedFactors(fraudScore);
-        String factorsJson;
-        try { factorsJson = objectMapper.writeValueAsString(factorsList); }
-        catch (Exception e) { factorsJson = "[]"; }
+        String finalDecision;
+        String status;
+        if (ruleResult.forceReject() || fraudScore >= autoRejection) {
+            finalDecision = "REJECTED"; status = "REJECTED";
+        } else if (ruleResult.forceReview() || fraudScore >= autoApproval) {
+            finalDecision = null; status = "MANUAL_REVIEW";
+        } else {
+            finalDecision = "APPROVED"; status = "APPROVED";
+        }
 
         int processingMs = (int)(System.currentTimeMillis() - startMs) + 15; // add base processing time
 
@@ -283,7 +387,7 @@ public class TransactionService {
             .fraudConfidence(confidence)
             .fraudPrediction(prediction)
             .fraudFactors(factorsJson)
-            .modelVersion("v2.1.0")
+            .modelVersion(modelVersion)
             .fraudFinalDecision(finalDecision)
             .transactionStatus(status)
             .processingTimeMs(processingMs)
@@ -332,8 +436,16 @@ public class TransactionService {
         return ApiResponse.ok(toDtoWithAudit(tx));
     }
 
-    private int simulateFraudScore(EvaluateTransactionReq req) {
-        // Try calling ML service first (prod profile — service must be running)
+    public record MlPredictionResult(
+        int score,
+        int confidence,
+        String prediction,
+        String modelVersion,
+        String factorsJson
+    ) {}
+
+    private MlPredictionResult getMlPrediction(EvaluateTransactionReq req) {
+        // Try calling ML service first (prod profile or when ML service is running)
         try {
             String url = mlServiceUrl + "/api/v1/predict";
             Map<String, Object> mlReq = new HashMap<>();
@@ -355,8 +467,21 @@ public class TransactionService {
             Map<String, Object> mlResp = restTemplate.postForObject(url, mlReq, Map.class);
             if (mlResp != null && mlResp.get("riskScore") != null) {
                 int score = ((Number) mlResp.get("riskScore")).intValue();
-                log.debug("ML service returned score={} for tx={}", score, req.getTransactionId());
-                return score;
+                int confidence = mlResp.get("confidence") != null
+                    ? ((Number) mlResp.get("confidence")).intValue()
+                    : Math.min(99, score + 5);
+                String prediction = (String) mlResp.getOrDefault("prediction", score > 50 ? "REJECT" : "APPROVE");
+                String modelVersion = (String) mlResp.getOrDefault("modelVersion", "v2.1.0");
+                String factorsJson = "[]";
+                if (mlResp.get("factors") != null) {
+                    try {
+                        factorsJson = objectMapper.writeValueAsString(mlResp.get("factors"));
+                    } catch (Exception e) {
+                        factorsJson = "[]";
+                    }
+                }
+                log.debug("ML service returned score={} prediction={} for tx={}", score, prediction, req.getTransactionId());
+                return new MlPredictionResult(score, confidence, prediction, modelVersion, factorsJson);
             }
         } catch (Exception ex) {
             log.warn("⚠️ ML service unavailable ({}), falling back to heuristic scorer", ex.getMessage());
@@ -369,7 +494,16 @@ public class TransactionService {
         if ("GAMBLING".equalsIgnoreCase(req.getMerchantCategory())) score += 25;
         if ("JEWELRY".equalsIgnoreCase(req.getMerchantCategory())) score += 15;
         if (req.getLocationCountry() != null && !req.getLocationCountry().equalsIgnoreCase("US")) score += 10;
-        return (int) Math.min(99, score);
+        int finalScore = (int) Math.min(99, score);
+        int finalConf = Math.min(99, finalScore + 6);
+        String finalPred = finalScore > 50 ? "REJECT" : "APPROVE";
+        String factors;
+        try {
+            factors = objectMapper.writeValueAsString(buildSimulatedFactors(finalScore));
+        } catch (Exception e) {
+            factors = "[]";
+        }
+        return new MlPredictionResult(finalScore, finalConf, finalPred, "v2.1.0-heuristic", factors);
     }
 
     private List<Map<String, Object>> buildSimulatedFactors(int score) {

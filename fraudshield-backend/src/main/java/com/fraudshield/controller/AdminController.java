@@ -45,4 +45,13 @@ public class AdminController {
             ? ResponseEntity.status(201).body(result)
             : ResponseEntity.badRequest().body(result);
     }
+
+    @PatchMapping("/users/{id}/status")
+    @Operation(summary = "Toggle user active status")
+    public ResponseEntity<ApiResponse<UserDto>> toggleUserStatus(@PathVariable Long id) {
+        ApiResponse<UserDto> result = adminService.toggleUserStatus(id);
+        return result.isSuccess()
+            ? ResponseEntity.ok(result)
+            : ResponseEntity.badRequest().body(result);
+    }
 }

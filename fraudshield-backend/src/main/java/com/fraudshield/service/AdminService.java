@@ -76,6 +76,21 @@ public class AdminService {
         return ApiResponse.ok(toUserDto(user));
     }
 
+    @Transactional
+    public ApiResponse<UserDto> toggleUserStatus(Long userId) {
+        Optional<AppUser> userOpt = userRepo.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ApiResponse.error("User not found with id: " + userId);
+        }
+        AppUser user = userOpt.get();
+        boolean newStatus = !Boolean.TRUE.equals(user.getIsActive());
+        user.setIsActive(newStatus);
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepo.save(user);
+        log.info("User {} ({}) status updated to isActive={}", user.getName(), user.getEmail(), newStatus);
+        return ApiResponse.ok(toUserDto(user));
+    }
+
     // ─── SETTINGS ─────────────────────────────────────────────────────────────
     public SettingsDto getSettings() {
         return configRepo.findAll().stream().findFirst()

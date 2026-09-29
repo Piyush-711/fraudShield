@@ -124,13 +124,14 @@ CREATE TABLE IF NOT EXISTS fraud_detection_rules (
     description          TEXT,
     rule_type            VARCHAR(50)  NOT NULL
         CHECK (rule_type IN ('THRESHOLD','VELOCITY','PATTERN','GEOLOCATION','DEVICE')),
-    rule_condition       JSONB        NOT NULL,
+    rule_condition       TEXT         NOT NULL,
     rule_action          VARCHAR(50),
     priority             INT          DEFAULT 100,
     enabled              BOOLEAN      DEFAULT TRUE,
     is_system_rule       BOOLEAN      DEFAULT FALSE,
     risk_score_impact    DECIMAL(5,2) DEFAULT 0.00,
     confidence_weight    DECIMAL(5,2) DEFAULT 1.00,
+    execution_timeout_ms INT          DEFAULT 100,
     times_triggered      INT          DEFAULT 0,
     last_triggered_at    TIMESTAMP,
     created_at           TIMESTAMP    DEFAULT NOW(),
@@ -186,6 +187,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_system_config_singleton ON system_config((
 CREATE TABLE IF NOT EXISTS model_versions (
     id                  BIGSERIAL    PRIMARY KEY,
     model_version       VARCHAR(50)  NOT NULL UNIQUE,
+    model_md5_hash      VARCHAR(64),
+    model_file_path     VARCHAR(255),
     model_description   TEXT,
     accuracy_rate       DECIMAL(5,2),
     precision_rate      DECIMAL(5,2),
@@ -205,6 +208,7 @@ CREATE INDEX IF NOT EXISTS idx_model_versions_active ON model_versions(is_active
 CREATE TABLE IF NOT EXISTS notifications (
     id                       BIGSERIAL    PRIMARY KEY,
     notification_type        VARCHAR(100),
+    recipient_id             BIGINT,
     recipient_email          VARCHAR(255),
     subject                  VARCHAR(255),
     message                  TEXT,

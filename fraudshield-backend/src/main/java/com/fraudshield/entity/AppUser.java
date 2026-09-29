@@ -26,6 +26,7 @@ public class AppUser {
     private String passwordHash;
 
     @Column(name = "is_active")
+    @Builder.Default
     private Boolean isActive = true;
 
     @Column(name = "last_login_at")
@@ -34,6 +35,17 @@ public class AppUser {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @PrePersist
-    protected void onCreate() { createdAt = LocalDateTime.now(); }
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

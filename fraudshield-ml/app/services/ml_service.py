@@ -8,7 +8,8 @@ from __future__ import annotations
 import logging
 import os
 import random
-from datetime import datetime
+import hashlib
+from datetime import datetime, timezone
 from typing import Any
 
 import joblib
@@ -47,6 +48,14 @@ FEATURE_NAMES = [
     "tx_count_proxy",          # placeholder – would be Redis in full implementation
     "amount_deviation_proxy",  # placeholder
 ]
+
+
+def _hash_user_id(user_id: str) -> float:
+    """Deterministic hash of userId independent of Python process seed."""
+    if not user_id:
+        return 0.0
+    digest = hashlib.md5(user_id.encode("utf-8")).hexdigest()
+    return float(int(digest[:8], 16) % 10_000)
 
 
 # ─── MODEL TRAINING (seed on startup if no pre-trained model exists) ─────────
@@ -140,9 +149,19 @@ def extract_features(payload: dict[str, Any]) -> np.ndarray:
     Missing fields are defaulted to safe values.
     """
     amount          = float(payload.get("amount", 0.0))
-    now             = datetime.utcnow()
-    hour            = now.hour
-    day_of_week     = now.weekday()
+    
+    # Use transaction timestamp if provided; fallback to current UTC time
+    tx_time_str = payload.get("createdAt") or payload.get("timestamp")
+    if tx_time_str:
+        try:
+            tx_time = datetime.fromisoformat(str(tx_time_str).replace("Z", "+00:00"))
+        except Exception:
+            tx_time = datetime.now(timezone.utc)
+    else:
+        tx_time = datetime.now(timezone.utc)
+
+    hour            = tx_time.hour
+    day_of_week     = tx_time.weekday()
     is_weekend      = int(day_of_week >= 5)
     is_night        = int(hour < 6 or hour > 22)
     country         = str(payload.get("locationCountry", "US")).upper()
@@ -161,7 +180,7 @@ def extract_features(payload: dict[str, Any]) -> np.ndarray:
     except ValueError:
         card_last4_num = 0.0
     user_id         = str(payload.get("userId", ""))
-    user_id_hash    = float(hash(user_id) % 10_000) if user_id else 0.0
+    user_id_hash    = _hash_user_id(user_id)
 
     features = np.array([[
         amount,
@@ -206,9 +225,22 @@ def _build_factors(payload: dict, score: int, importances: np.ndarray) -> list[d
     if cat == "LUXURY":
         candidates.append({"factor": "luxury_merchant",        "weight": 0.20, "explanation": "Luxury goods category has higher fraud incidence"})
 
+    # Incorporate feature importances into weights if model is trained
+    if importances is not None and len(importances) == len(FEATURE_NAMES):
+        for c in candidates:
+            f = c["factor"]
+            if "amount" in f:
+                c["weight"] = round(min(0.95, c["weight"] * (1.0 + float(importances[0]))), 2)
+            elif "gambling" in f:
+                c["weight"] = round(min(0.95, c["weight"] * (1.0 + float(importances[7]))), 2)
+            elif "jewelry" in f:
+                c["weight"] = round(min(0.95, c["weight"] * (1.0 + float(importances[8]))), 2)
+
     if not candidates:
         candidates.append({"factor": "normal_pattern", "weight": 0.05, "explanation": "Transaction matches expected spending patterns"})
 
+    # Sort candidates by adjusted weight descending
+    candidates.sort(key=lambda x: x["weight"], reverse=True)
     return candidates[:3]
 
 

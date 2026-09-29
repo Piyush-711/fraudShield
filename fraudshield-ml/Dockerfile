@@ -13,8 +13,9 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY app/ ./app/
 
-# Non-root user for security
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+# Non-root user for security with writable model directory
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser && \
+    mkdir -p /app/model && chown -R appuser:appgroup /app
 USER appuser
 
 EXPOSE 8000

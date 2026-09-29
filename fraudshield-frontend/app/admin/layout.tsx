@@ -1,12 +1,13 @@
 'use client';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import DashboardLayout from '@/app/dashboard/layout';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
     let user: any = null;
@@ -20,6 +21,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
     if (user?.role !== 'SYSTEM_ADMIN') {
       router.push('/dashboard');
+    } else {
+      setAuthorized(true);
     }
   }, [router]);
 
@@ -28,8 +31,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href:'/admin/users', label:'👥 User Management' },
   ];
 
+  if (!authorized) {
+    return null;
+  }
+
   return (
-    <div>
+    <DashboardLayout>
       <div style={{ display:'flex', gap:4, marginBottom:24, background:'white', borderRadius:10, padding:4, border:'1px solid #E5E7EB', width:'fit-content' }}>
         {tabs.map(tab => (
           <Link key={tab.href} href={tab.href} style={{ padding:'8px 18px', borderRadius:8, textDecoration:'none', fontSize:13, fontWeight:600, background: pathname===tab.href?'#4F46E5':'transparent', color: pathname===tab.href?'white':'#6B7280', transition:'all 0.15s' }}>
@@ -38,6 +45,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         ))}
       </div>
       {children}
-    </div>
+    </DashboardLayout>
   );
 }

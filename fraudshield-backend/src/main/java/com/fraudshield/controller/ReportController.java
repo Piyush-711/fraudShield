@@ -26,10 +26,10 @@ public class ReportController {
         LocalDateTime since = LocalDateTime.now().minusDays(days);
 
         long total        = transactionRepo.countSince(since);
-        long approved     = transactionRepo.countByTransactionStatus("APPROVED");
-        long rejected     = transactionRepo.countByTransactionStatus("REJECTED");
-        long pending      = transactionRepo.countPendingReviews();
-        long highRisk     = transactionRepo.countHighRisk();
+        long approved     = transactionRepo.countByTransactionStatusSince("APPROVED", since);
+        long rejected     = transactionRepo.countByTransactionStatusSince("REJECTED", since);
+        long pending      = transactionRepo.countPendingReviewsSince(since);
+        long highRisk     = transactionRepo.countHighRiskSince(since);
         long activeAlerts = alertRepo.countByStatus("ACTIVE");
 
         Double avgMs = transactionRepo.avgProcessingTimeSince(since);

@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -43,6 +44,23 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     @Query("SELECT AVG(t.processingTimeMs) FROM Transaction t WHERE t.createdAt >= :since")
     Double avgProcessingTimeSince(@Param("since") LocalDateTime since);
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE t.transactionStatus = :status AND t.createdAt >= :since")
+    long countByTransactionStatusSince(@Param("status") String status, @Param("since") LocalDateTime since);
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE t.transactionStatus = 'MANUAL_REVIEW' AND t.createdAt >= :since")
+    long countPendingReviewsSince(@Param("since") LocalDateTime since);
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE t.createdAt >= :start AND t.createdAt < :end")
+    long countBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE t.fraudScore >= 70 AND t.createdAt >= :start AND t.createdAt < :end")
+    long countHighRiskBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    List<Transaction> findByCreatedAtAfterOrderByCreatedAtAsc(LocalDateTime since);
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE t.userId = :userId AND t.createdAt >= :since")
+    long countByUserIdAndCreatedAtAfter(@Param("userId") String userId, @Param("since") LocalDateTime since);
 
     long countByTransactionStatus(String status);
 

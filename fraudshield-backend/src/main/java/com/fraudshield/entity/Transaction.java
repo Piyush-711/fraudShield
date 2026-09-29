@@ -34,6 +34,7 @@ public class Transaction {
     private BigDecimal amount;
 
     @Column(length = 3)
+    @Builder.Default
     private String currency = "USD";
 
     @Column(name = "merchant_name")
@@ -45,7 +46,7 @@ public class Transaction {
     @Column(name = "card_type")
     private String cardType;
 
-    @Column(name = "card_last4")
+    @Column(name = "card_last_4")
     private String cardLast4;
 
     @Column(name = "transaction_type")

@@ -37,6 +37,11 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
+    // If reverse proxy / gateway returns 502/503/504, treat backend as unavailable
+    if (res.status === 502 || res.status === 503 || res.status === 504) {
+      throw new Error('USE_MOCK');
+    }
+
     // Backend is available, but returned an error response
     let errMsg = `HTTP ${res.status}`;
     try {
@@ -258,6 +263,22 @@ export async function fetchUsers(): Promise<User[]> {
     throw err;
   }
 }
+
+export async function toggleUserStatus(id: number): Promise<User> {
+  await delay(200);
+  try {
+    const res = await apiFetch<any>(`/admin/users/${id}/status`, { method: 'PATCH' });
+    return res.data as User;
+  } catch (err: any) {
+    if (err.message === 'USE_MOCK') {
+      const user = MOCK_USERS.find(u => u.id === id);
+      if (user) user.isActive = !user.isActive;
+      return user || { id, name: 'User', email: '', role: 'ANALYST_VIEWER', isActive: true };
+    }
+    throw err;
+  }
+}
+
 
 export async function fetchHealth(): Promise<{ status: string; services: Record<string, string> }> {
   await delay(200);

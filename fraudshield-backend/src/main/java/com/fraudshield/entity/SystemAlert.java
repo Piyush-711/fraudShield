@@ -25,6 +25,7 @@ public class SystemAlert {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String message;
 
+    @Builder.Default
     private String status = "ACTIVE"; // ACTIVE, ACKNOWLEDGED, RESOLVED, ESCALATED
 
     @Column(name = "transaction_id")
@@ -38,6 +39,9 @@ public class SystemAlert {
 
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
+
+    @Column(name = "resolution_notes", columnDefinition = "TEXT")
+    private String resolutionNotes;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

@@ -34,9 +34,11 @@ public class Notification {
 
     // Channel
     @Column(nullable = false)
+    @Builder.Default
     private String channel = "EMAIL"; // EMAIL, SLACK, IN_APP
 
     // Status
+    @Builder.Default
     private String status = "QUEUED"; // QUEUED, SENT, FAILED, BOUNCED
 
     @Column(name = "sent_at")
@@ -47,6 +49,7 @@ public class Notification {
 
     // Error Handling
     @Column(name = "retry_count")
+    @Builder.Default
     private Integer retryCount = 0;
 
     @Column(name = "last_error_message", columnDefinition = "TEXT")
