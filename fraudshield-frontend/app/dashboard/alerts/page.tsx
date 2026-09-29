@@ -2,206 +2,462 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { fetchAlerts, acknowledgeAlert } from '@/lib/api';
-import { Alert, AlertSeverity, AlertStatus } from '@/lib/types';
+import { Alert, AlertSeverity } from '@/lib/types';
 import { timeAgo, formatDate } from '@/lib/mockData';
+import {
+  AlertOctagon,
+  AlertTriangle,
+  Info,
+  CheckCircle2,
+  RefreshCw,
+  Clock,
+  ArrowUpRight,
+  Search,
+  User as UserIcon,
+  ExternalLink,
+  ChevronRight,
+  ChevronDown,
+  ShieldAlert,
+  Zap,
+  ServerCrash,
+  Wrench,
+  Lock,
+  Filter,
+  Calendar,
+  Tag,
+  Check,
+  BellRing
+} from 'lucide-react';
 
-const severityConfig: Record<AlertSeverity, { color:string; bg:string; icon:string }> = {
-  CRITICAL: { color:'#991B1B', bg:'#FEE2E2', icon:'🔴' },
-  HIGH:     { color:'#92400E', bg:'#FEF3C7', icon:'🟠' },
-  MEDIUM:   { color:'#1E40AF', bg:'#DBEAFE', icon:'🟡' },
-  LOW:      { color:'#065F46', bg:'#D1FAE5', icon:'🟢' },
+const severityConfig: Record<AlertSeverity, {
+  color: string;
+  bg: string;
+  badgeBg: string;
+  badgeText: string;
+  borderLeft: string;
+  Icon: any;
+}> = {
+  CRITICAL: {
+    color: 'text-red-700',
+    bg: 'bg-red-50 border-red-200',
+    badgeBg: 'bg-red-100 text-red-800 border-red-200',
+    badgeText: 'text-red-700',
+    borderLeft: 'border-l-rose-600',
+    Icon: AlertOctagon,
+  },
+  HIGH: {
+    color: 'text-amber-700',
+    bg: 'bg-amber-50 border-amber-200',
+    badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
+    badgeText: 'text-amber-700',
+    borderLeft: 'border-l-amber-500',
+    Icon: AlertTriangle,
+  },
+  MEDIUM: {
+    color: 'text-blue-700',
+    bg: 'bg-blue-50 border-blue-200',
+    badgeBg: 'bg-blue-100 text-blue-800 border-blue-200',
+    badgeText: 'text-blue-700',
+    borderLeft: 'border-l-blue-500',
+    Icon: Info,
+  },
+  LOW: {
+    color: 'text-emerald-700',
+    bg: 'bg-emerald-50 border-emerald-200',
+    badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    badgeText: 'text-emerald-700',
+    borderLeft: 'border-l-emerald-500',
+    Icon: CheckCircle2,
+  },
 };
 
-const typeIcon: Record<string, string> = {
-  FRAUD_DETECTED: '🚨', PERF_DEGRADED: '⚡', SERVICE_DOWN: '🔴',
-  INFRA_ALERT: '🔧', SECURITY_ALERT: '🔒', THRESHOLD_EXCEEDED: '⚠️',
-};
+function getAlertTypeIcon(type: string) {
+  switch (type) {
+    case 'FRAUD_DETECTED': return ShieldAlert;
+    case 'PERF_DEGRADED': return Zap;
+    case 'SERVICE_DOWN': return ServerCrash;
+    case 'INFRA_ALERT': return Wrench;
+    case 'SECURITY_ALERT': return Lock;
+    case 'THRESHOLD_EXCEEDED': return AlertTriangle;
+    default: return AlertTriangle;
+  }
+}
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
-  const [actionMenu, setActionMenu] = useState<number|null>(null);
-  const [toast, setToast] = useState('');
+  const [actionMenu, setActionMenu] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    const data = await fetchAlerts();
-    setAlerts(data);
-    setLoading(false);
+  const load = async (isManual = false) => {
+    if (isManual) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const data = await fetchAlerts();
+      setAlerts(data);
+    } catch (e) {
+      console.error("Failed to load alerts:", e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
-  const handleAction = async (id: number, action: 'ACKNOWLEDGED'|'RESOLVED'|'ESCALATED') => {
+  const handleAction = async (id: number, action: 'ACKNOWLEDGED' | 'RESOLVED' | 'ESCALATED') => {
     await acknowledgeAlert(id, action);
     setActionMenu(null);
-    showToast(`Alert ${action.toLowerCase()} successfully`);
+    showToast(`Alert marked as ${action.toLowerCase()}`);
     load();
   };
 
   const filtered = alerts.filter(a => {
     if (statusFilter !== 'ALL' && a.status !== statusFilter) return false;
     if (severityFilter !== 'ALL' && a.severity !== severityFilter) return false;
-    if (search && !a.title.toLowerCase().includes(search.toLowerCase()) && !a.message.toLowerCase().includes(search.toLowerCase())) return false;
+    if (
+      search &&
+      !a.title.toLowerCase().includes(search.toLowerCase()) &&
+      !a.message.toLowerCase().includes(search.toLowerCase()) &&
+      !(a.transactionId && a.transactionId.toLowerCase().includes(search.toLowerCase()))
+    ) return false;
     return true;
   });
 
-  const counts = { ACTIVE: alerts.filter(a=>a.status==='ACTIVE').length, ACKNOWLEDGED: alerts.filter(a=>a.status==='ACKNOWLEDGED').length, RESOLVED: alerts.filter(a=>a.status==='RESOLVED').length };
+  const counts = {
+    ACTIVE: alerts.filter(a => a.status === 'ACTIVE').length,
+    ACKNOWLEDGED: alerts.filter(a => a.status === 'ACKNOWLEDGED').length,
+    RESOLVED: alerts.filter(a => a.status === 'RESOLVED').length,
+  };
 
   return (
-    <div style={{ animation:'fadeIn 0.3s ease' }}>
-      {/* Header */}
-      <div style={{ marginBottom:24 }}>
-        <nav style={{ fontSize:12, color:'#9CA3AF', marginBottom:8 }}>
-          <Link href="/dashboard" style={{ color:'#6B7280', textDecoration:'none' }}>Dashboard</Link>
-          <span style={{ margin:'0 6px' }}>›</span>
-          <span style={{ color:'#1F2937' }}>Alerts</span>
+    <div className="space-y-6 animate-fadeIn pb-12">
+      {/* Header & Breadcrumb */}
+      <div>
+        <nav className="flex items-center gap-1.5 text-xs font-medium text-slate-400 mb-2">
+          <Link href="/dashboard" className="text-slate-500 hover:text-indigo-600 transition-colors">
+            Dashboard
+          </Link>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+          <span className="text-slate-800 font-semibold">Incident Alerts</span>
         </nav>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 style={{ fontSize:24, fontWeight:700, color:'#1F2937', margin:'0 0 4px' }}>🔔 Alerts Dashboard</h1>
-            <p style={{ fontSize:13, color:'#9CA3AF', margin:0 }}>Monitor and respond to system alerts in real-time</p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+              <span>Security & Operational Alerts</span>
+              {counts.ACTIVE > 0 && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">
+                  {counts.ACTIVE} Active
+                </span>
+              )}
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Real-time threat feeds, system anomalies, and rule trigger alerts
+            </p>
           </div>
-          <button onClick={load} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid #E5E7EB', background:'white', cursor:'pointer', fontSize:13, color:'#374151' }}>🔄 Refresh</button>
-        </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
-        {[
-          { label:'Active', count:counts.ACTIVE, color:'#EF4444', bg:'#FEE2E2', icon:'🔴', filter:'ACTIVE' },
-          { label:'Acknowledged', count:counts.ACKNOWLEDGED, color:'#F59E0B', bg:'#FEF3C7', icon:'👁️', filter:'ACKNOWLEDGED' },
-          { label:'Resolved', count:counts.RESOLVED, color:'#10B981', bg:'#D1FAE5', icon:'✅', filter:'RESOLVED' },
-        ].map(c => (
-          <button key={c.label} onClick={() => setStatusFilter(statusFilter===c.filter?'ALL':c.filter)}
-            style={{ background:'white', border:`2px solid ${statusFilter===c.filter?c.color:'#E5E7EB'}`, borderRadius:12, padding:16, cursor:'pointer', textAlign:'left', transition:'all 0.15s' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <div>
-                <p style={{ fontSize:12, color:'#6B7280', margin:'0 0 4px', fontWeight:500 }}>{c.label}</p>
-                <p style={{ fontSize:28, fontWeight:700, color:c.color, margin:0 }}>{c.count}</p>
-              </div>
-              <span style={{ fontSize:32, background:c.bg, borderRadius:10, padding:'6px 10px' }}>{c.icon}</span>
-            </div>
+          <button
+            onClick={() => load(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-indigo-600' : 'text-slate-500'}`} />
+            <span>Refresh Feed</span>
           </button>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div style={{ background:'white', borderRadius:12, border:'1px solid #E5E7EB', padding:'12px 16px', marginBottom:16, display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
-        <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{ padding:'8px 12px', borderRadius:8, border:'1px solid #E5E7EB', fontSize:13, background:'white', cursor:'pointer' }}>
-          <option value="ALL">All Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="ACKNOWLEDGED">Acknowledged</option>
-          <option value="RESOLVED">Resolved</option>
-          <option value="ESCALATED">Escalated</option>
-        </select>
-        <select value={severityFilter} onChange={e=>setSeverityFilter(e.target.value)} style={{ padding:'8px 12px', borderRadius:8, border:'1px solid #E5E7EB', fontSize:13, background:'white', cursor:'pointer' }}>
-          <option value="ALL">All Severities</option>
-          <option value="CRITICAL">Critical</option>
-          <option value="HIGH">High</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="LOW">Low</option>
-        </select>
-        <div style={{ flex:1, minWidth:180, position:'relative' }}>
-          <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#9CA3AF' }}>🔍</span>
-          <input type="text" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search alerts..." style={{ width:'100%', padding:'8px 12px 8px 32px', borderRadius:8, border:'1px solid #E5E7EB', fontSize:13, outline:'none', boxSizing:'border-box' }} />
         </div>
       </div>
 
-      {/* Alerts List */}
-      <div style={{ background:'white', borderRadius:12, border:'1px solid #E5E7EB', overflow:'hidden' }}>
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          {
+            label: 'Active Incidents',
+            count: counts.ACTIVE,
+            filter: 'ACTIVE',
+            icon: AlertOctagon,
+            iconColor: 'text-rose-600',
+            iconBg: 'bg-rose-50',
+            activeRing: 'border-rose-500 ring-2 ring-rose-500/20',
+          },
+          {
+            label: 'Acknowledged',
+            count: counts.ACKNOWLEDGED,
+            filter: 'ACKNOWLEDGED',
+            icon: Clock,
+            iconColor: 'text-amber-600',
+            iconBg: 'bg-amber-50',
+            activeRing: 'border-amber-500 ring-2 ring-amber-500/20',
+          },
+          {
+            label: 'Resolved',
+            count: counts.RESOLVED,
+            filter: 'RESOLVED',
+            icon: CheckCircle2,
+            iconColor: 'text-emerald-600',
+            iconBg: 'bg-emerald-50',
+            activeRing: 'border-emerald-500 ring-2 ring-emerald-500/20',
+          },
+        ].map(item => {
+          const ItemIcon = item.icon;
+          const isSelected = statusFilter === item.filter;
+          return (
+            <button
+              key={item.label}
+              onClick={() => setStatusFilter(statusFilter === item.filter ? 'ALL' : item.filter)}
+              className={`text-left bg-white p-4 rounded-xl border transition-all shadow-sm ${
+                isSelected
+                  ? `${item.activeRing} bg-slate-50/50`
+                  : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{item.label}</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{item.count}</p>
+                </div>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.iconBg}`}>
+                  <ItemIcon className={`w-5 h-5 ${item.iconColor}`} />
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="appearance-none bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium px-3 py-2 pr-8 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-colors"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="ACKNOWLEDGED">Acknowledged</option>
+              <option value="RESOLVED">Resolved</option>
+              <option value="ESCALATED">Escalated</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          <div className="relative">
+            <select
+              value={severityFilter}
+              onChange={e => setSeverityFilter(e.target.value)}
+              className="appearance-none bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium px-3 py-2 pr-8 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-colors"
+            >
+              <option value="ALL">All Severities</option>
+              <option value="CRITICAL">Critical</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          {(statusFilter !== 'ALL' || severityFilter !== 'ALL' || search) && (
+            <button
+              onClick={() => {
+                setStatusFilter('ALL');
+                setSeverityFilter('ALL');
+                setSearch('');
+              }}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-800 px-2 py-1"
+            >
+              Reset filters
+            </button>
+          )}
+        </div>
+
+        <div className="relative flex-1 max-w-sm">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search alerts, messages, transactions..."
+            className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
+          />
+        </div>
+      </div>
+
+      {/* Alerts Feed */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div style={{ padding:60, textAlign:'center' }}>
-            <div style={{ width:36, height:36, border:'3px solid #E5E7EB', borderTopColor:'#4F46E5', borderRadius:'50%', animation:'spin 1s linear infinite', margin:'0 auto' }} />
+          <div className="p-16 flex flex-col items-center justify-center text-slate-400">
+            <RefreshCw className="w-8 h-8 animate-spin text-indigo-600 mb-3" />
+            <p className="text-xs font-medium">Fetching real-time incident feed...</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding:60, textAlign:'center' }}>
-            <span style={{ fontSize:40 }}>🎉</span>
-            <p style={{ fontSize:16, fontWeight:600, color:'#374151', margin:'12px 0 4px' }}>No alerts found</p>
-            <p style={{ fontSize:13, color:'#9CA3AF' }}>Adjust your filters or check back later</p>
+          <div className="p-16 text-center">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+            </div>
+            <p className="text-sm font-semibold text-slate-800">No alerts found</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+              There are no incident alerts matching your current filter criteria.
+            </p>
           </div>
         ) : (
-          filtered.map((alert, i) => {
-            const sev = severityConfig[alert.severity];
-            const isActive = alert.status === 'ACTIVE';
-            return (
-              <div key={alert.id} style={{ padding:'16px 20px', borderBottom: i < filtered.length-1 ? '1px solid #F3F4F6' : 'none', display:'flex', gap:16, alignItems:'flex-start', background: isActive ? '#FFFBF5' : 'white', transition:'background 0.15s' }}>
-                {/* Icon */}
-                <div style={{ width:44, height:44, borderRadius:10, background:sev.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:20 }}>
-                  {typeIcon[alert.alertType] ?? '⚠️'}
-                </div>
+          <div className="divide-y divide-slate-100">
+            {filtered.map(alert => {
+              const sev = severityConfig[alert.severity];
+              const SeverityIcon = sev.Icon;
+              const TypeIcon = getAlertTypeIcon(alert.alertType);
+              const isActive = alert.status === 'ACTIVE';
 
-                {/* Content */}
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, marginBottom:4 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                      <span style={{ fontSize:14, fontWeight:700, color:'#1F2937' }}>{alert.title}</span>
-                      <span style={{ background:sev.bg, color:sev.color, borderRadius:4, padding:'2px 8px', fontSize:11, fontWeight:700 }}>{alert.severity}</span>
-                      <span style={{ background: isActive?'#FEE2E2':alert.status==='ACKNOWLEDGED'?'#FEF3C7':'#D1FAE5', color: isActive?'#991B1B':alert.status==='ACKNOWLEDGED'?'#92400E':'#065F46', borderRadius:4, padding:'2px 8px', fontSize:11, fontWeight:600 }}>{alert.status}</span>
+              return (
+                <div
+                  key={alert.id}
+                  className={`p-4 sm:p-5 flex flex-col sm:flex-row gap-4 items-start transition-colors border-l-4 ${sev.borderLeft} ${
+                    isActive ? 'bg-amber-50/20 hover:bg-amber-50/30' : 'bg-white hover:bg-slate-50/60'
+                  }`}
+                >
+                  {/* Leading Icon */}
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      isActive ? 'bg-rose-50 border border-rose-100' : 'bg-slate-100 border border-slate-200'
+                    }`}
+                  >
+                    <TypeIcon className={`w-5 h-5 ${isActive ? 'text-rose-600' : 'text-slate-600'}`} />
+                  </div>
+
+                  {/* Body Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-slate-900">{alert.title}</span>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${sev.badgeBg}`}
+                        >
+                          <SeverityIcon className="w-3 h-3" />
+                          <span>{alert.severity}</span>
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${
+                            alert.status === 'ACTIVE'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : alert.status === 'ACKNOWLEDGED'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}
+                        >
+                          {alert.status}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{timeAgo(alert.createdAt)}</span>
+                      </span>
                     </div>
-                    <span style={{ fontSize:12, color:'#9CA3AF', flexShrink:0 }}>{timeAgo(alert.createdAt)}</span>
-                  </div>
-                  <p style={{ fontSize:13, color:'#6B7280', margin:'0 0 6px', lineHeight:1.5 }}>{alert.message}</p>
-                  <div style={{ display:'flex', gap:16, alignItems:'center', fontSize:12, color:'#9CA3AF' }}>
-                    <span>📅 {formatDate(alert.createdAt)}</span>
-                    <span>🏷️ {alert.alertType.replace(/_/g,' ')}</span>
-                    {alert.transactionId && <Link href={`/dashboard/transactions/${alert.transactionId}`} style={{ color:'#4F46E5', textDecoration:'none', fontWeight:500 }}>🔗 {alert.transactionId}</Link>}
-                    {alert.acknowledgedBy && <span>👤 {alert.acknowledgedBy}</span>}
-                  </div>
-                </div>
 
-                {/* Actions */}
-                <div style={{ position:'relative', flexShrink:0 }}>
-                  <div style={{ display:'flex', gap:8 }}>
+                    <p className="text-xs text-slate-600 leading-relaxed mb-3">{alert.message}</p>
+
+                    {/* Metadata tags */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
+                      <span className="inline-flex items-center gap-1 text-slate-500">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{formatDate(alert.createdAt)}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-slate-500 font-mono text-[11px]">
+                        <Tag className="w-3 h-3 text-slate-400" />
+                        <span>{alert.alertType.replace(/_/g, ' ')}</span>
+                      </span>
+                      {alert.transactionId && (
+                        <Link
+                          href={`/dashboard/transactions/${alert.transactionId}`}
+                          className="inline-flex items-center gap-1 font-mono text-indigo-600 hover:text-indigo-800 font-medium"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>{alert.transactionId}</span>
+                        </Link>
+                      )}
+                      {alert.acknowledgedBy && (
+                        <span className="inline-flex items-center gap-1 text-slate-500">
+                          <UserIcon className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{alert.acknowledgedBy}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions Column */}
+                  <div className="flex sm:flex-col items-center gap-2 self-end sm:self-center relative flex-shrink-0">
                     {alert.transactionId && (
-                      <Link href={`/dashboard/transactions/${alert.transactionId}`} style={{ padding:'6px 12px', borderRadius:6, background:'#EEF2FF', color:'#4F46E5', textDecoration:'none', fontSize:12, fontWeight:600 }}>
-                        View
+                      <Link
+                        href={`/dashboard/transactions/${alert.transactionId}`}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors"
+                      >
+                        <span>Investigate</span>
+                        <ArrowUpRight className="w-3.5 h-3.5" />
                       </Link>
                     )}
+
                     {isActive && (
-                      <button onClick={() => setActionMenu(actionMenu===alert.id?null:alert.id)} style={{ padding:'6px 12px', borderRadius:6, background:'#F3F4F6', color:'#374151', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
-                        Mark ▾
-                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={() => setActionMenu(actionMenu === alert.id ? null : alert.id)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-sm transition-all"
+                        >
+                          <span>Action</span>
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                        </button>
+
+                        {actionMenu === alert.id && (
+                          <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-30 animate-fadeIn">
+                            <button
+                              onClick={() => handleAction(alert.id, 'ACKNOWLEDGED')}
+                              className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                            >
+                              <Clock className="w-3.5 h-3.5 text-amber-500" />
+                              <span>Acknowledge</span>
+                            </button>
+                            <button
+                              onClick={() => handleAction(alert.id, 'RESOLVED')}
+                              className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                              <span>Resolve Incident</span>
+                            </button>
+                            <button
+                              onClick={() => handleAction(alert.id, 'ESCALATED')}
+                              className="w-full px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2"
+                            >
+                              <ArrowUpRight className="w-3.5 h-3.5 text-rose-500" />
+                              <span>Escalate to Lead</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
-                  {actionMenu === alert.id && (
-                    <div style={{ position:'absolute', right:0, top:'100%', marginTop:4, background:'white', border:'1px solid #E5E7EB', borderRadius:8, boxShadow:'0 10px 30px rgba(0,0,0,0.1)', zIndex:100, minWidth:160, overflow:'hidden' }}>
-                      {[
-                        { action:'ACKNOWLEDGED' as const, label:'👁️ Acknowledge', color:'#374151' },
-                        { action:'RESOLVED' as const, label:'✅ Resolve', color:'#065F46' },
-                        { action:'ESCALATED' as const, label:'⬆️ Escalate', color:'#92400E' },
-                      ].map(opt => (
-                        <button key={opt.action} onClick={() => handleAction(alert.id, opt.action)} style={{ display:'block', width:'100%', padding:'10px 16px', background:'white', border:'none', cursor:'pointer', fontSize:13, color:opt.color, textAlign:'left', fontWeight:500 }}
-                          onMouseEnter={e=>(e.currentTarget.style.background='#F9FAFB')} onMouseLeave={e=>(e.currentTarget.style.background='white')}>
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* Toast */}
+      {/* Floating Toast Notification */}
       {toast && (
-        <div style={{ position:'fixed', bottom:24, right:24, background:'#1F2937', color:'white', borderRadius:10, padding:'12px 20px', fontSize:14, fontWeight:500, zIndex:9999, animation:'slideUp 0.3s ease', boxShadow:'0 10px 30px rgba(0,0,0,0.2)' }}>
-          ✅ {toast}
+        <div className="fixed bottom-6 right-6 flex items-center gap-2.5 px-4 py-3 bg-slate-900 text-white rounded-xl shadow-xl text-xs font-medium z-50 animate-slideUp">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <span>{toast.message}</span>
         </div>
       )}
-
-      <style>{`
-        @keyframes spin { to{transform:rotate(360deg)} }
-        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
-        @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
-      `}</style>
     </div>
   );
 }

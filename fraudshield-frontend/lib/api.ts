@@ -273,7 +273,7 @@ export async function toggleUserStatus(id: number): Promise<User> {
     if (err.message === 'USE_MOCK') {
       const user = MOCK_USERS.find(u => u.id === id);
       if (user) user.isActive = !user.isActive;
-      return user || { id, name: 'User', email: '', role: 'ANALYST_VIEWER', isActive: true };
+      return user || { id, name: 'User', email: '', role: 'ANALYST_VIEWER', isActive: true, lastLoginAt: new Date().toISOString() };
     }
     throw err;
   }

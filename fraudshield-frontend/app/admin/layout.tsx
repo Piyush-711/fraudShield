@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/app/dashboard/layout';
+import { Sliders, Users, ShieldAlert, ShieldCheck } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -27,8 +28,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [router]);
 
   const tabs = [
-    { href:'/admin/settings', label:'⚙️ System Settings' },
-    { href:'/admin/users', label:'👥 User Management' },
+    { href: '/admin/settings', label: 'System Settings', icon: Sliders },
+    { href: '/admin/users', label: 'User Directory', icon: Users },
   ];
 
   if (!authorized) {
@@ -37,12 +38,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <DashboardLayout>
-      <div style={{ display:'flex', gap:4, marginBottom:24, background:'white', borderRadius:10, padding:4, border:'1px solid #E5E7EB', width:'fit-content' }}>
-        {tabs.map(tab => (
-          <Link key={tab.href} href={tab.href} style={{ padding:'8px 18px', borderRadius:8, textDecoration:'none', fontSize:13, fontWeight:600, background: pathname===tab.href?'#4F46E5':'transparent', color: pathname===tab.href?'white':'#6B7280', transition:'all 0.15s' }}>
-            {tab.label}
-          </Link>
-        ))}
+      <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200 shadow-sm w-fit mb-6">
+        {tabs.map(tab => {
+          const Icon = tab.icon;
+          const isActive = pathname === tab.href;
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                isActive
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+              <span>{tab.label}</span>
+            </Link>
+          );
+        })}
       </div>
       {children}
     </DashboardLayout>

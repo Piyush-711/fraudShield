@@ -1,40 +1,94 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import {
+  ArrowLeft,
+  ShieldCheck,
+  ShieldAlert,
+  CreditCard,
+  Globe,
+  Smartphone,
+  Laptop,
+  Clock,
+  Cpu,
+  Zap,
+  Copy,
+  Check,
+  MapPin,
+  Calendar,
+  User,
+  History,
+  AlertTriangle,
+  ArrowRight,
+} from 'lucide-react';
 import { fetchTransactionById } from '@/lib/api';
 import { TransactionDetail } from '@/lib/types';
 import { formatCurrency, formatDate, getRiskLevel } from '@/lib/mockData';
 
 function RiskBadge({ score }: { score: number }) {
   const level = getRiskLevel(score);
-  const cfg = { HIGH:{ bg:'#FEE2E2',color:'#991B1B',label:'HIGH RISK' }, MEDIUM:{ bg:'#FEF3C7',color:'#92400E',label:'MEDIUM RISK' }, LOW:{ bg:'#D1FAE5',color:'#065F46',label:'LOW RISK' } }[level];
-  return <span style={{ background:cfg.bg, color:cfg.color, borderRadius:6, padding:'4px 12px', fontSize:13, fontWeight:700 }}>{cfg.label} · {score}/100</span>;
-}
+  const cfg = {
+    HIGH: { bg: 'bg-rose-50 text-rose-700 border-rose-200', label: 'CRITICAL THREAT' },
+    MEDIUM: { bg: 'bg-amber-50 text-amber-700 border-amber-200', label: 'SUSPICIOUS' },
+    LOW: { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'LOW RISK' },
+  }[level];
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string,{bg:string;color:string}> = { APPROVED:{bg:'#D1FAE5',color:'#065F46'}, REJECTED:{bg:'#FEE2E2',color:'#991B1B'}, MANUAL_REVIEW:{bg:'#DBEAFE',color:'#1E40AF'}, PENDING:{bg:'#FEF3C7',color:'#92400E'} };
-  const s = map[status] ?? { bg:'#F3F4F6', color:'#6B7280' };
-  return <span style={{ background:s.bg, color:s.color, borderRadius:6, padding:'4px 12px', fontSize:13, fontWeight:600 }}>{status.replace('_',' ')}</span>;
-}
-
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div style={{ display:'flex', padding:'10px 0', borderBottom:'1px solid #F3F4F6' }}>
-      <span style={{ width:220, fontSize:13, color:'#6B7280', fontWeight:500, flexShrink:0 }}>{label}</span>
-      <span style={{ fontSize:13, color:'#1F2937', fontWeight:500 }}>{value}</span>
-    </div>
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${cfg.bg}`}>
+      {level === 'HIGH' ? (
+        <ShieldAlert className="w-3.5 h-3.5" />
+      ) : (
+        <ShieldCheck className="w-3.5 h-3.5" />
+      )}
+      <span>
+        {cfg.label} · {score} / 100
+      </span>
+    </span>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function StatusChip({ status }: { status: string }) {
+  const configs: Record<string, { bg: string; text: string; dot: string; label: string }> = {
+    APPROVED: {
+      bg: 'bg-emerald-50 border-emerald-200/80',
+      text: 'text-emerald-700',
+      dot: 'bg-emerald-500',
+      label: 'Approved',
+    },
+    REJECTED: {
+      bg: 'bg-rose-50 border-rose-200/80',
+      text: 'text-rose-700',
+      dot: 'bg-rose-500',
+      label: 'Rejected',
+    },
+    MANUAL_REVIEW: {
+      bg: 'bg-amber-50 border-amber-200/80',
+      text: 'text-amber-700',
+      dot: 'bg-amber-500',
+      label: 'Under Manual Review',
+    },
+    PENDING: {
+      bg: 'bg-sky-50 border-sky-200/80',
+      text: 'text-sky-700',
+      dot: 'bg-sky-500',
+      label: 'Pending Ingestion',
+    },
+  };
+
+  const c = configs[status] || {
+    bg: 'bg-slate-50 border-slate-200',
+    text: 'text-slate-600',
+    dot: 'bg-slate-400',
+    label: status.replace(/_/g, ' '),
+  };
+
   return (
-    <div style={{ background:'white', borderRadius:12, border:'1px solid #E5E7EB', boxShadow:'0 1px 3px rgba(0,0,0,0.05)', marginBottom:16 }}>
-      <div style={{ padding:'16px 20px', borderBottom:'1px solid #F3F4F6' }}>
-        <h3 style={{ fontSize:15, fontWeight:700, color:'#1F2937', margin:0 }}>{title}</h3>
-      </div>
-      <div style={{ padding:'4px 20px 16px' }}>{children}</div>
-    </div>
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border ${c.bg} ${c.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+      {c.label}
+    </span>
   );
 }
 
@@ -43,162 +97,321 @@ export default function TransactionDetailPage() {
   const router = useRouter();
   const [tx, setTx] = useState<TransactionDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetchTransactionById(id).then(data => { setTx(data); setLoading(false); });
+    fetchTransactionById(id).then((data) => {
+      setTx(data);
+      setLoading(false);
+    });
   }, [id]);
 
-  if (loading) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:400 }}>
-      <div style={{ width:40, height:40, border:'3px solid #E5E7EB', borderTopColor:'#4F46E5', borderRadius:'50%', animation:'spin 1s linear infinite' }} />
-    </div>
-  );
+  const handleCopyId = () => {
+    if (!tx) return;
+    navigator.clipboard.writeText(tx.transactionId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-  if (!tx) return (
-    <div style={{ textAlign:'center', padding:80 }}>
-      <span style={{ fontSize:48 }}>🔍</span>
-      <h2 style={{ color:'#374151', marginTop:16 }}>Transaction Not Found</h2>
-      <p style={{ color:'#9CA3AF' }}>No transaction with ID: {id}</p>
-      <Link href="/dashboard/transactions" style={{ color:'#4F46E5', textDecoration:'none', fontWeight:500 }}>← Back to Transactions</Link>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse py-8 max-w-4xl mx-auto">
+        <div className="h-6 bg-slate-200 rounded w-48 mb-4"></div>
+        <div className="h-36 bg-slate-200 rounded-2xl"></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="h-64 bg-slate-200 rounded-2xl"></div>
+          <div className="h-64 bg-slate-200 rounded-2xl"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tx) {
+    return (
+      <div className="text-center py-24 max-w-md mx-auto space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+          <AlertTriangle className="w-8 h-8 text-rose-500" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-800">Transaction Not Found</h2>
+        <p className="text-xs text-slate-500">
+          No records found matching Transaction ID: <code className="font-mono">{id}</code>
+        </p>
+        <Link
+          href="/dashboard/transactions"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 pt-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Return to Transaction Explorer</span>
+        </Link>
+      </div>
+    );
+  }
 
   const canReview = tx.transactionStatus === 'MANUAL_REVIEW' || tx.transactionStatus === 'PENDING';
 
   return (
-    <div style={{ animation:'fadeIn 0.3s ease', maxWidth:900 }}>
-      {/* Breadcrumb */}
-      <nav style={{ fontSize:12, color:'#9CA3AF', marginBottom:16 }}>
-        <Link href="/dashboard" style={{ color:'#6B7280', textDecoration:'none' }}>Dashboard</Link>
-        <span style={{ margin:'0 6px' }}>›</span>
-        <Link href="/dashboard/transactions" style={{ color:'#6B7280', textDecoration:'none' }}>Transactions</Link>
-        <span style={{ margin:'0 6px' }}>›</span>
-        <span style={{ color:'#1F2937', fontFamily:'monospace' }}>{tx.transactionId}</span>
-      </nav>
+    <div className="max-w-5xl mx-auto space-y-6 animate-fadeIn pb-12">
+      {/* ── Breadcrumb & Back Bar ── */}
+      <div className="flex items-center justify-between">
+        <nav className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+          <Link href="/dashboard" className="hover:text-indigo-600 transition-colors">
+            Dashboard
+          </Link>
+          <span>/</span>
+          <Link href="/dashboard/transactions" className="hover:text-indigo-600 transition-colors">
+            Transactions
+          </Link>
+          <span>/</span>
+          <span className="font-mono text-slate-700">{tx.transactionId}</span>
+        </nav>
 
-      {/* Header */}
-      <div style={{ background:'white', borderRadius:12, border:'1px solid #E5E7EB', padding:24, marginBottom:16, boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:16 }}>
-          <div>
-            <h1 style={{ fontSize:22, fontWeight:700, color:'#1F2937', margin:'0 0 8px', fontFamily:'monospace' }}>{tx.transactionId}</h1>
-            <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Back</span>
+        </button>
+      </div>
+
+      {/* ── Transaction Headline Card ── */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
+                {tx.transactionId}
+              </h1>
+              <button
+                onClick={handleCopyId}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                title="Copy Transaction ID"
+              >
+                {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
               <RiskBadge score={tx.fraudScore} />
-              <StatusBadge status={tx.transactionStatus} />
-              <span style={{ background:'#F3F4F6', color:'#6B7280', borderRadius:6, padding:'4px 12px', fontSize:12 }}>
-                ⚡ {tx.processingTimeMs}ms
+              <StatusChip status={tx.transactionStatus} />
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+                {tx.processingTimeMs}ms
               </span>
-              <span style={{ background:'#F3F4F6', color:'#6B7280', borderRadius:6, padding:'4px 12px', fontSize:12 }}>
-                🤖 Model {tx.modelVersion}
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200">
+                <Cpu className="w-3.5 h-3.5 text-indigo-500" />
+                Model {tx.modelVersion || 'v2.1.0'}
               </span>
             </div>
           </div>
-          <div style={{ display:'flex', gap:10 }}>
-            <button onClick={() => router.back()} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid #E5E7EB', background:'white', color:'#374151', cursor:'pointer', fontSize:13, fontWeight:500 }}>
-              ← Back
-            </button>
-            {canReview && (
-              <Link href={`/dashboard/transactions/${id}/review`} style={{ padding:'8px 20px', borderRadius:8, background:'#4F46E5', color:'white', textDecoration:'none', fontSize:13, fontWeight:600 }}>
-                📋 Review Transaction
-              </Link>
-            )}
-          </div>
+
+          {canReview && (
+            <Link
+              href={`/dashboard/transactions/${id}/review`}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/25 transition-all self-start md:self-center"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Submit Analyst Decision</span>
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* Transaction Details */}
-      <Section title="📄 Transaction Details">
-        <InfoRow label="Transaction ID" value={<span style={{ fontFamily:'monospace', color:'#4F46E5' }}>{tx.transactionId}</span>} />
-        <InfoRow label="Date & Time" value={formatDate(tx.createdAt)} />
-        <InfoRow label="Amount" value={<span style={{ fontSize:16, fontWeight:700, color:'#1F2937' }}>{formatCurrency(tx.amount, tx.currency)}</span>} />
-        <InfoRow label="User ID" value={<span style={{ fontFamily:'monospace' }}>{tx.userId}</span>} />
-        <InfoRow label="User Email" value={tx.userEmail} />
-        <InfoRow label="Merchant" value={`${tx.merchantName} (${tx.merchantCategory})`} />
-        <InfoRow label="Card" value={`${tx.cardType} ····${tx.cardLast4}`} />
-        <InfoRow label="Transaction Type" value={tx.transactionType} />
-        <InfoRow label="Location" value={`${tx.location.city}, ${tx.location.country} · IP: ${tx.location.ipAddress}`} />
-        <InfoRow label="Device" value={`${tx.deviceType} (${tx.deviceOs})`} />
-      </Section>
-
-      {/* Fraud Detection Result */}
-      <Section title="🤖 Fraud Detection Analysis">
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, margin:'12px 0 20px' }}>
-          {[
-            { label:'Risk Score', value:`${tx.fraudScore}/100`, color: tx.fraudScore>=70?'#EF4444':tx.fraudScore>=40?'#F59E0B':'#10B981' },
-            { label:'Confidence', value:`${tx.fraudConfidence}%`, color:'#4F46E5' },
-            { label:'ML Decision', value:tx.fraudPrediction, color: tx.fraudPrediction==='REJECT'?'#EF4444':'#10B981' },
-          ].map(m => (
-            <div key={m.label} style={{ background:'#F9FAFB', borderRadius:10, padding:16, textAlign:'center', border:`2px solid ${m.color}20` }}>
-              <p style={{ fontSize:12, color:'#9CA3AF', margin:'0 0 6px', fontWeight:500 }}>{m.label}</p>
-              <p style={{ fontSize:24, fontWeight:700, color:m.color, margin:0 }}>{m.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Risk Score Bar */}
-        <div style={{ marginBottom:20 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'#9CA3AF', marginBottom:6 }}>
-            <span>0</span><span>Risk Score</span><span>100</span>
-          </div>
-          <div style={{ height:10, background:'#F3F4F6', borderRadius:5, overflow:'hidden' }}>
-            <div style={{ height:'100%', width:`${tx.fraudScore}%`, background: tx.fraudScore>=70?'linear-gradient(90deg,#F59E0B,#EF4444)':tx.fraudScore>=40?'linear-gradient(90deg,#10B981,#F59E0B)':'#10B981', borderRadius:5, transition:'width 0.8s ease' }} />
-          </div>
-        </div>
-
-        <h4 style={{ fontSize:14, fontWeight:600, color:'#374151', margin:'0 0 12px' }}>⚠️ Risk Factors</h4>
-        {tx.fraudFactors.map((f, i) => (
-          <div key={i} style={{ display:'flex', gap:14, padding:'12px 0', borderBottom:'1px solid #F3F4F6' }}>
-            <div style={{ width:42, height:42, borderRadius:8, background:'#FEE2E2', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-              <span style={{ fontSize:18 }}>{i===0?'💰':i===1?'🏪':i===2?'🕐':'📍'}</span>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-                <span style={{ fontSize:13, fontWeight:600, color:'#1F2937' }}>{f.factor.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}</span>
-                <span style={{ fontSize:12, fontWeight:600, color:'#EF4444', background:'#FEE2E2', borderRadius:4, padding:'2px 8px' }}>Weight: {(f.weight*100).toFixed(0)}%</span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: AI Explainability Factors & Risk Signals */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* AI Explainability Card */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-indigo-600" />
+                  AI Model Explainability Factors
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Top weighted behavioral and telemetry signals evaluated by the ML ensemble
+                </p>
               </div>
-              <p style={{ fontSize:12, color:'#6B7280', margin:0 }}>{f.explanation}</p>
-              <div style={{ marginTop:6, height:4, background:'#F3F4F6', borderRadius:2 }}>
-                <div style={{ height:'100%', width:`${f.weight*100}%`, background:'#EF4444', borderRadius:2 }} />
-              </div>
+              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                Confidence: {tx.fraudConfidence}%
+              </span>
             </div>
-          </div>
-        ))}
-      </Section>
 
-      {/* Manual Review Result (if reviewed) */}
-      {tx.reviewedAt && (
-        <Section title="✅ Manual Review Result">
-          <InfoRow label="Final Decision" value={<StatusBadge status={tx.fraudFinalDecision ?? tx.transactionStatus} />} />
-          <InfoRow label="Reviewed At" value={formatDate(tx.reviewedAt)} />
-          {tx.manualReviewReason && <InfoRow label="Reason" value={tx.manualReviewReason} />}
-          {tx.manualReviewNotes && <InfoRow label="Notes" value={tx.manualReviewNotes} />}
-        </Section>
-      )}
+            <div className="space-y-3 pt-1">
+              {tx.fraudFactors && tx.fraudFactors.length > 0 ? (
+                tx.fraudFactors.map((f, i) => (
+                  <div
+                    key={i}
+                    className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/60 space-y-2"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-800 capitalize">
+                        {f.factor.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-500">
+                        Weight: {Math.round(f.weight * 100)}%
+                      </span>
+                    </div>
 
-      {/* Audit History */}
-      <Section title="📜 Audit History">
-        <div style={{ position:'relative', paddingLeft:24 }}>
-          <div style={{ position:'absolute', left:8, top:8, bottom:8, width:2, background:'#E5E7EB', borderRadius:1 }} />
-          {tx.auditHistory.map((log, i) => (
-            <div key={log.id} style={{ position:'relative', marginBottom:20 }}>
-              <div style={{ position:'absolute', left:-20, top:4, width:10, height:10, borderRadius:'50%', background: i===0?'#4F46E5':'#E5E7EB', border:'2px solid white' }} />
-              <div style={{ background:'#F9FAFB', borderRadius:8, padding:12 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                  <span style={{ fontSize:13, fontWeight:600, color:'#1F2937' }}>{log.actionType.replace(/_/g,' ')}</span>
-                  <span style={{ fontSize:11, color:'#9CA3AF' }}>{formatDate(log.timestamp)}</span>
+                    {/* Weight bar */}
+                    <div className="w-full h-1.5 bg-slate-200/70 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-indigo-600 rounded-full"
+                        style={{ width: `${Math.min(f.weight * 100, 100)}%` }}
+                      />
+                    </div>
+
+                    <p className="text-xs text-slate-600">{f.explanation}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="py-6 text-center text-slate-400 text-xs">
+                  No risk deviation anomalies detected for this transaction profile.
                 </div>
-                <p style={{ fontSize:12, color:'#6B7280', margin:'0 0 4px' }}>By: <strong>{log.actorId}</strong> ({log.actorRole})</p>
-                {log.changeReason && <p style={{ fontSize:12, color:'#374151', margin:0 }}>📝 {log.changeReason}</p>}
-                {log.newValue && <p style={{ fontSize:12, color:'#374151', margin:'4px 0 0' }}>→ {log.oldValue ?? '—'} <strong style={{ color:'#4F46E5' }}>→ {log.newValue}</strong></p>}
+              )}
+            </div>
+          </div>
+
+          {/* Audit History & Decision Trail */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2 border-b border-slate-100 pb-3">
+              <History className="w-4 h-4 text-slate-500" />
+              Audit Log & Decision History
+            </h3>
+
+            <div className="relative pl-6 space-y-5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+              {tx.auditHistory && tx.auditHistory.length > 0 ? (
+                tx.auditHistory.map((log) => (
+                  <div key={log.id} className="relative">
+                    <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-indigo-600 ring-4 ring-indigo-50" />
+                    <div className="text-xs space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 uppercase">
+                          {log.actionType}
+                        </span>
+                        <span className="text-slate-400">by {log.actorId}</span>
+                        {log.actorRole && (
+                          <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-semibold">
+                            {log.actorRole}
+                          </span>
+                        )}
+                      </div>
+                      {log.changeReason && (
+                        <p className="text-slate-600 text-[11px] bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          {log.changeReason}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-slate-400">{formatDate(log.timestamp)}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-slate-400">
+                  Transaction ingested and automatically classified by rule engine.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Transaction Details, Card & Telemetry */}
+        <div className="space-y-6">
+          {/* Financial Details */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2 border-b border-slate-100 pb-3">
+              <CreditCard className="w-4 h-4 text-slate-500" />
+              Payment & Merchant
+            </h3>
+
+            <div className="divide-y divide-slate-100 text-xs">
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500">Amount</span>
+                <span className="font-bold text-base text-slate-900">
+                  {formatCurrency(tx.amount)} {tx.currency}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500">Merchant</span>
+                <span className="font-semibold text-slate-800">{tx.merchantName}</span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500">Category</span>
+                <span className="font-medium text-slate-700 uppercase text-[11px]">
+                  {tx.merchantCategory}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500">Card Payment</span>
+                <span className="font-medium text-slate-800">
+                  {tx.cardType} ···· {tx.cardLast4}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500">Channel</span>
+                <span className="font-medium text-slate-800">{tx.transactionType}</span>
               </div>
             </div>
-          ))}
-        </div>
-      </Section>
+          </div>
 
-      <style>{`
-        @keyframes spin { to { transform:rotate(360deg); } }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-      `}</style>
+          {/* Account Profile */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2 border-b border-slate-100 pb-3">
+              <User className="w-4 h-4 text-slate-500" />
+              Account Identity
+            </h3>
+
+            <div className="divide-y divide-slate-100 text-xs">
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500">User ID</span>
+                <span className="font-semibold font-mono text-slate-800">{tx.userId}</span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500">Email</span>
+                <span className="font-medium text-slate-800 truncate max-w-[160px]">
+                  {tx.userEmail}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500">Created At</span>
+                <span className="text-slate-600 text-[11px]">{formatDate(tx.createdAt)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Telemetry & Geolocation */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2 border-b border-slate-100 pb-3">
+              <Globe className="w-4 h-4 text-slate-500" />
+              Device & Geolocation
+            </h3>
+
+            <div className="divide-y divide-slate-100 text-xs">
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500">Location</span>
+                <span className="font-semibold text-slate-800 flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                  {tx.location?.city}, {tx.location?.country}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500">IP Address</span>
+                <span className="font-mono text-slate-800">{tx.location?.ipAddress}</span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500">Device</span>
+                <span className="font-medium text-slate-800 flex items-center gap-1">
+                  {tx.deviceType === 'MOBILE' ? (
+                    <Smartphone className="w-3.5 h-3.5 text-slate-400" />
+                  ) : (
+                    <Laptop className="w-3.5 h-3.5 text-slate-400" />
+                  )}
+                  {tx.deviceType} ({tx.deviceOs})
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

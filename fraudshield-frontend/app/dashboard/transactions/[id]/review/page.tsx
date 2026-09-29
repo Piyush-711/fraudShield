@@ -1,7 +1,21 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  PhoneCall,
+  Flag,
+  FileCheck2,
+  Bookmark,
+  ShieldCheck,
+  RefreshCw,
+  Info,
+} from 'lucide-react';
 import { fetchTransactionById, submitManualReview } from '@/lib/api';
 import { TransactionDetail } from '@/lib/types';
 import { formatCurrency } from '@/lib/mockData';
@@ -15,7 +29,7 @@ export default function ReviewPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
-  const [decision, setDecision] = useState<'APPROVED'|'REJECTED'|'MANUAL_REVIEW'|''>('');
+  const [decision, setDecision] = useState<'APPROVED' | 'REJECTED' | 'MANUAL_REVIEW' | ''>('');
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [confirmed, setConfirmed] = useState(false);
@@ -24,188 +38,360 @@ export default function ReviewPage() {
   const [showCancel, setShowCancel] = useState(false);
 
   useEffect(() => {
-    fetchTransactionById(id).then(data => { setTx(data); setLoading(false); });
+    fetchTransactionById(id).then((data) => {
+      setTx(data);
+      setLoading(false);
+    });
   }, [id]);
 
   const canSubmit = decision && reason.length >= 10 && confirmed;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
-    setSubmitting(true); setError('');
+    setSubmitting(true);
+    setError('');
     try {
-      await submitManualReview(id, { decision: decision as any, reason, notes, contactCustomer, flagForInvestigation: flagInvestigation });
+      await submitManualReview(id, {
+        decision: decision as any,
+        reason,
+        notes,
+        contactCustomer,
+        flagForInvestigation: flagInvestigation,
+      });
       setSubmitted(true);
-      setTimeout(() => router.push('/dashboard/transactions'), 3000);
-    } catch { setError('Failed to submit. Please try again.'); }
-    finally { setSubmitting(false); }
+      setTimeout(() => router.push('/dashboard/transactions'), 2500);
+    } catch {
+      setError('Failed to submit review decision. Please check backend connectivity.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  if (loading) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:400 }}>
-      <div style={{ width:40, height:40, border:'3px solid #E5E7EB', borderTopColor:'#4F46E5', borderRadius:'50%', animation:'spin 1s linear infinite' }} />
-    </div>
-  );
-
-  if (submitted) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:500 }}>
-      <div style={{ textAlign:'center', background:'white', borderRadius:16, padding:48, boxShadow:'0 10px 40px rgba(0,0,0,0.1)', maxWidth:420 }}>
-        <div style={{ width:72, height:72, borderRadius:'50%', background:'#D1FAE5', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px', animation:'bounceIn 0.5s ease' }}>
-          <span style={{ fontSize:36 }}>✅</span>
-        </div>
-        <h2 style={{ fontSize:22, fontWeight:700, color:'#1F2937', margin:'0 0 8px' }}>Review Submitted!</h2>
-        <p style={{ color:'#6B7280', fontSize:14, margin:'0 0 8px' }}>Decision: <strong style={{ color: decision==='APPROVED'?'#10B981':'#EF4444' }}>{decision}</strong></p>
-        <p style={{ color:'#6B7280', fontSize:14, margin:'0 0 24px' }}>Reason: {reason}</p>
-        <p style={{ fontSize:13, color:'#9CA3AF' }}>Redirecting in 3 seconds...</p>
-        <Link href="/dashboard/transactions" style={{ display:'inline-block', marginTop:12, padding:'10px 24px', background:'#4F46E5', color:'white', borderRadius:8, textDecoration:'none', fontWeight:600, fontSize:14 }}>
-          Go Back Now
-        </Link>
+  if (loading) {
+    return (
+      <div className="py-24 text-center max-w-md mx-auto space-y-3">
+        <RefreshCw className="w-8 h-8 animate-spin mx-auto text-indigo-600" />
+        <p className="text-xs text-slate-500 font-medium">Loading transaction review session...</p>
       </div>
-    </div>
-  );
+    );
+  }
 
-  const decisionBtns = [
-    { value:'APPROVED', label:'✅ Approve', desc:'Override ML and approve', color:'#10B981', bg:'#D1FAE5', selected:'#059669' },
-    { value:'REJECTED', label:'❌ Reject', desc:'Confirm ML rejection', color:'#EF4444', bg:'#FEE2E2', selected:'#DC2626' },
-    { value:'MANUAL_REVIEW', label:'⏸ Escalate', desc:'Send to fraud team', color:'#3B82F6', bg:'#DBEAFE', selected:'#2563EB' },
+  if (submitted) {
+    return (
+      <div className="py-16 flex items-center justify-center animate-fadeIn">
+        <div className="bg-white rounded-2xl p-8 border border-slate-200/80 shadow-md text-center max-w-md w-full space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-200">
+            <CheckCircle2 className="w-8 h-8 stroke-[2]" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+            Decision Submitted Successfully
+          </h2>
+          <p className="text-xs text-slate-600">
+            Decision outcome:{' '}
+            <strong
+              className={`uppercase font-bold ${
+                decision === 'APPROVED' ? 'text-emerald-600' : 'text-rose-600'
+              }`}
+            >
+              {decision}
+            </strong>
+          </p>
+          <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-100">
+            "{reason}"
+          </p>
+          <p className="text-[11px] text-slate-400">Redirecting to transactions feed in 2s...</p>
+          <Link
+            href="/dashboard/transactions"
+            className="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-colors"
+          >
+            Return to Feed
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const decisionOptions = [
+    {
+      value: 'APPROVED',
+      label: 'Approve Transaction',
+      desc: 'Mark payment as genuine and clear risk flag',
+      icon: CheckCircle2,
+      activeBorder: 'border-emerald-500 bg-emerald-50/50 text-emerald-900 ring-2 ring-emerald-500/20',
+      iconColor: 'text-emerald-600',
+    },
+    {
+      value: 'REJECTED',
+      label: 'Reject & Block',
+      desc: 'Confirm fraudulent pattern and decline transaction',
+      icon: XCircle,
+      activeBorder: 'border-rose-500 bg-rose-50/50 text-rose-900 ring-2 ring-rose-500/20',
+      iconColor: 'text-rose-600',
+    },
+    {
+      value: 'MANUAL_REVIEW',
+      label: 'Escalate to Tier 2',
+      desc: 'Assign to Senior Fraud Investigation unit',
+      icon: AlertTriangle,
+      activeBorder: 'border-amber-500 bg-amber-50/50 text-amber-900 ring-2 ring-amber-500/20',
+      iconColor: 'text-amber-600',
+    },
   ];
 
-  const inputStyle = { width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid #D1D5DB', fontSize:14, outline:'none', boxSizing:'border-box' as const, fontFamily:'Inter,sans-serif' };
-
   return (
-    <div style={{ animation:'fadeIn 0.3s ease', maxWidth:800 }}>
-      <nav style={{ fontSize:12, color:'#9CA3AF', marginBottom:16 }}>
-        <Link href="/dashboard" style={{ color:'#6B7280', textDecoration:'none' }}>Dashboard</Link>
-        <span style={{ margin:'0 6px' }}>›</span>
-        <Link href="/dashboard/transactions" style={{ color:'#6B7280', textDecoration:'none' }}>Transactions</Link>
-        <span style={{ margin:'0 6px' }}>›</span>
-        <Link href={`/dashboard/transactions/${id}`} style={{ color:'#6B7280', textDecoration:'none', fontFamily:'monospace' }}>{id}</Link>
-        <span style={{ margin:'0 6px' }}>›</span>
-        <span style={{ color:'#1F2937' }}>Review</span>
+    <div className="max-w-3xl mx-auto space-y-6 animate-fadeIn pb-12">
+      {/* ── Breadcrumb ── */}
+      <nav className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+        <Link href="/dashboard" className="hover:text-indigo-600 transition-colors">
+          Dashboard
+        </Link>
+        <span>/</span>
+        <Link href="/dashboard/transactions" className="hover:text-indigo-600 transition-colors">
+          Transactions
+        </Link>
+        <span>/</span>
+        <Link
+          href={`/dashboard/transactions/${id}`}
+          className="font-mono hover:text-indigo-600 transition-colors"
+        >
+          {id}
+        </Link>
+        <span>/</span>
+        <span className="text-slate-700">Analyst Review</span>
       </nav>
 
-      <h1 style={{ fontSize:22, fontWeight:700, color:'#1F2937', margin:'0 0 20px' }}>📋 Manual Review</h1>
+      {/* ── Header ── */}
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+          <FileCheck2 className="w-6 h-6 text-indigo-600" />
+          Fraud Analyst Adjudication
+        </h1>
+        <p className="text-xs text-slate-500 mt-1">
+          Review evidence, record resolution reasoning, and commit final risk decision
+        </p>
+      </div>
 
-      {/* Transaction Summary */}
-      <div style={{ background:'linear-gradient(135deg,#1e1b4b,#312e81)', borderRadius:12, padding:20, marginBottom:16, color:'white' }}>
-        <p style={{ fontSize:12, opacity:0.7, margin:'0 0 8px', textTransform:'uppercase', letterSpacing:'0.05em' }}>Transaction Summary</p>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:16 }}>
-          {[
-            { label:'Transaction', value: tx?.transactionId ?? id, mono:true },
-            { label:'Amount', value: tx ? formatCurrency(tx.amount) : '—' },
-            { label:'Merchant', value: tx?.merchantName ?? '—' },
-            { label:'ML Risk Score', value: `${tx?.fraudScore ?? 0}/100` },
-            { label:'ML Decision', value: tx?.fraudPrediction ?? '—' },
-            { label:'Current Status', value: tx?.transactionStatus?.replace('_',' ') ?? '—' },
-          ].map(item => (
-            <div key={item.label}>
-              <p style={{ fontSize:11, opacity:0.6, margin:'0 0 2px' }}>{item.label}</p>
-              <p style={{ fontSize:14, fontWeight:700, margin:0, fontFamily: item.mono?'monospace':'inherit' }}>{item.value}</p>
-            </div>
-          ))}
-        </div>
-        {tx?.fraudFactors && tx.fraudFactors.length > 0 && (
-          <div style={{ marginTop:12, borderTop:'1px solid rgba(255,255,255,0.15)', paddingTop:12 }}>
-            <p style={{ fontSize:11, opacity:0.6, margin:'0 0 6px' }}>TOP RISK FACTORS</p>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {tx.fraudFactors.slice(0,3).map((f,i) => (
-                <span key={i} style={{ background:'rgba(255,255,255,0.15)', borderRadius:4, padding:'3px 10px', fontSize:12 }}>
-                  {f.factor.replace(/_/g,' ')} ({(f.weight*100).toFixed(0)}%)
-                </span>
-              ))}
-            </div>
+      {/* ── Transaction Brief Card ── */}
+      <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-sm space-y-4">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          Target Transaction Brief
+        </span>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+          <div>
+            <span className="text-slate-400 text-[11px]">Transaction ID</span>
+            <p className="font-mono font-bold text-sm text-indigo-300 mt-0.5">{tx?.transactionId ?? id}</p>
           </div>
-        )}
-      </div>
-
-      {/* Error */}
-      {error && <div style={{ background:'#FEE2E2', border:'1px solid #FECACA', borderRadius:8, padding:'12px 16px', marginBottom:16, color:'#991B1B', fontSize:14 }}>✗ {error}</div>}
-
-      {/* Decision */}
-      <div style={{ background:'white', borderRadius:12, border:'1px solid #E5E7EB', padding:20, marginBottom:16 }}>
-        <h3 style={{ fontSize:15, fontWeight:700, color:'#1F2937', margin:'0 0 16px' }}>Your Decision *</h3>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
-          {decisionBtns.map(btn => (
-            <button key={btn.value} onClick={() => setDecision(btn.value as any)}
-              style={{ padding:16, borderRadius:10, border:`2px solid ${decision===btn.value?btn.color:'#E5E7EB'}`, background: decision===btn.value?btn.bg:'white', cursor:'pointer', textAlign:'center', transition:'all 0.15s' }}>
-              <p style={{ fontSize:20, margin:'0 0 6px' }}>{btn.label.split(' ')[0]}</p>
-              <p style={{ fontSize:13, fontWeight:700, color: decision===btn.value?btn.color:'#374151', margin:'0 0 2px' }}>{btn.label.slice(3)}</p>
-              <p style={{ fontSize:11, color:'#9CA3AF', margin:0 }}>{btn.desc}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Reason & Notes */}
-      <div style={{ background:'white', borderRadius:12, border:'1px solid #E5E7EB', padding:20, marginBottom:16 }}>
-        <h3 style={{ fontSize:15, fontWeight:700, color:'#1F2937', margin:'0 0 16px' }}>Review Details</h3>
-
-        <div style={{ marginBottom:16 }}>
-          <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>Reason * <span style={{ color:'#9CA3AF', fontWeight:400 }}>(min. 10 characters)</span></label>
-          <input type="text" value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Verified by phone call with customer" style={{ ...inputStyle, border: reason && reason.length < 10 ? '2px solid #EF4444' : '1px solid #D1D5DB' }} />
-          <div style={{ display:'flex', justifyContent:'space-between', marginTop:4 }}>
-            {reason.length < 10 && reason.length > 0 && <span style={{ fontSize:11, color:'#EF4444' }}>Minimum 10 characters required</span>}
-            <span style={{ fontSize:11, color:'#9CA3AF', marginLeft:'auto' }}>{reason.length}/500</span>
+          <div>
+            <span className="text-slate-400 text-[11px]">Total Amount</span>
+            <p className="font-bold text-sm text-white mt-0.5">{tx ? formatCurrency(tx.amount) : '—'}</p>
+          </div>
+          <div>
+            <span className="text-slate-400 text-[11px]">Merchant</span>
+            <p className="font-semibold text-white mt-0.5">{tx?.merchantName ?? '—'}</p>
+          </div>
+          <div>
+            <span className="text-slate-400 text-[11px]">ML Risk Score</span>
+            <p className="font-bold text-sm text-rose-400 mt-0.5">{tx?.fraudScore ?? 0} / 100</p>
+          </div>
+          <div>
+            <span className="text-slate-400 text-[11px]">ML Initial Model</span>
+            <p className="font-semibold text-white mt-0.5">{tx?.modelVersion || 'v2.1.0'}</p>
+          </div>
+          <div>
+            <span className="text-slate-400 text-[11px]">Status</span>
+            <p className="font-semibold text-amber-400 uppercase mt-0.5">
+              {tx?.transactionStatus?.replace(/_/g, ' ') ?? '—'}
+            </p>
           </div>
         </div>
+      </div>
 
-        <div style={{ marginBottom:16 }}>
-          <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>Additional Notes <span style={{ color:'#9CA3AF', fontWeight:400 }}>(optional)</span></label>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Any additional context or notes..." style={{ ...inputStyle, resize:'vertical' }} />
+      {error && (
+        <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-xl flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
         </div>
+      )}
 
-        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {[
-            { id:'confirm', checked:confirmed, set:setConfirmed, label:'✓ I confirm this is my final decision', required:true, color:'#4F46E5' },
-            { id:'contact', checked:contactCustomer, set:setContactCustomer, label:'📞 Contact customer to verify transaction', required:false, color:'#6B7280' },
-            { id:'flag', checked:flagInvestigation, set:setFlagInvestigation, label:'🚩 Flag for fraud investigation team', required:false, color:'#6B7280' },
-          ].map(opt => (
-            <label key={opt.id} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
-              <input type="checkbox" id={opt.id} checked={opt.checked} onChange={e => opt.set(e.target.checked)}
-                style={{ width:18, height:18, accentColor:'#4F46E5', cursor:'pointer' }} />
-              <span style={{ fontSize:13, color: opt.checked ? opt.color : '#6B7280', fontWeight: opt.checked ? 600 : 400 }}>{opt.label}</span>
-              {opt.required && <span style={{ fontSize:11, color:'#EF4444' }}>*</span>}
-            </label>
-          ))}
+      {/* ── Decision Selectors ── */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+        <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+          Select Adjudication Decision <span className="text-rose-500">*</span>
+        </h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {decisionOptions.map((opt) => {
+            const isSelected = decision === opt.value;
+            const Icon = opt.icon;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setDecision(opt.value as any)}
+                className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  isSelected
+                    ? opt.activeBorder
+                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <Icon className={`w-5 h-5 ${opt.iconColor}`} />
+                  {isSelected && <span className="w-2 h-2 rounded-full bg-indigo-600" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-xs text-slate-900">{opt.label}</h3>
+                  <p className="text-[11px] text-slate-500 mt-1 leading-snug">{opt.desc}</p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div style={{ display:'flex', gap:12, alignItems:'center' }}>
-        <button onClick={handleSubmit} disabled={!canSubmit || submitting}
-          style={{ padding:'12px 28px', borderRadius:8, border:'none', background: canSubmit?'linear-gradient(135deg,#4F46E5,#7C3AED)':'#D1D5DB', color:'white', fontSize:14, fontWeight:600, cursor: canSubmit?'pointer':'not-allowed', display:'flex', alignItems:'center', gap:8, transition:'all 0.2s' }}>
-          {submitting ? <><span style={{ width:16, height:16, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'white', borderRadius:'50%', display:'inline-block', animation:'spin 1s linear infinite' }} />Submitting...</> : '✓ Submit Review'}
+      {/* ── Review Details Form ── */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-5">
+        <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+          Decision Rationale & Compliance Notes
+        </h2>
+
+        {/* Reason field */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-slate-700 block">
+            Resolution Justification <span className="text-rose-500">*</span>{' '}
+            <span className="text-slate-400 font-normal">(Minimum 10 characters required)</span>
+          </label>
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Cardholder identity verified via secondary mobile authentication"
+            className={`w-full px-3.5 py-2 text-xs bg-slate-50 border rounded-xl focus:bg-white transition-all outline-none ${
+              reason.length > 0 && reason.length < 10
+                ? 'border-rose-400 focus:ring-2 focus:ring-rose-500/20'
+                : 'border-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
+            }`}
+          />
+          <div className="flex items-center justify-between text-[11px] pt-0.5">
+            {reason.length > 0 && reason.length < 10 ? (
+              <span className="text-rose-600">Must be at least 10 characters long</span>
+            ) : (
+              <span className="text-slate-400">Clear audit rationale will be logged</span>
+            )}
+            <span className="text-slate-400">{reason.length} / 500</span>
+          </div>
+        </div>
+
+        {/* Additional Notes */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-slate-700 block">
+            Investigation Notes <span className="text-slate-400 font-normal">(Optional)</span>
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Include any relevant communication, reference numbers, or supporting details..."
+            className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+          />
+        </div>
+
+        {/* Verification Checkboxes */}
+        <div className="pt-2 space-y-2.5 border-t border-slate-100">
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+            />
+            <span className="text-xs font-semibold text-slate-800">
+              I certify this is an authoritative final risk adjudication{' '}
+              <span className="text-rose-500">*</span>
+            </span>
+          </label>
+
+          <label className="flex items-center gap-3 cursor-pointer group text-slate-600">
+            <input
+              type="checkbox"
+              checked={contactCustomer}
+              onChange={(e) => setContactCustomer(e.target.checked)}
+              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+            />
+            <span className="text-xs flex items-center gap-1.5">
+              <PhoneCall className="w-3.5 h-3.5 text-slate-400" />
+              Customer verification callback requested
+            </span>
+          </label>
+
+          <label className="flex items-center gap-3 cursor-pointer group text-slate-600">
+            <input
+              type="checkbox"
+              checked={flagInvestigation}
+              onChange={(e) => setFlagInvestigation(e.target.checked)}
+              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+            />
+            <span className="text-xs flex items-center gap-1.5">
+              <Flag className="w-3.5 h-3.5 text-slate-400" />
+              Flag merchant for chargeback audit review
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* ── Action Buttons ── */}
+      <div className="flex items-center gap-3 pt-2">
+        <button
+          onClick={handleSubmit}
+          disabled={!canSubmit || submitting}
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-xs text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs transition-all cursor-pointer"
+        >
+          {submitting ? (
+            <>
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>Committing Decision...</span>
+            </>
+          ) : (
+            <>
+              <ShieldCheck className="w-4 h-4" />
+              <span>Submit Adjudication</span>
+            </>
+          )}
         </button>
-        <button onClick={() => setShowCancel(true)} style={{ padding:'12px 20px', borderRadius:8, border:'1px solid #E5E7EB', background:'white', color:'#6B7280', fontSize:14, cursor:'pointer', fontWeight:500 }}>
+
+        <button
+          onClick={() => setShowCancel(true)}
+          className="px-4 py-2.5 rounded-xl font-semibold text-xs text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 transition-colors cursor-pointer"
+        >
           Cancel
         </button>
-        <button onClick={() => { alert('Draft saved!'); }} style={{ padding:'12px 20px', borderRadius:8, border:'1px solid #4F46E5', background:'#EEF2FF', color:'#4F46E5', fontSize:14, cursor:'pointer', fontWeight:500 }}>
-          💾 Save Draft
-        </button>
       </div>
 
-      {/* Cancel Confirmation Modal */}
+      {/* ── Discard Modal ── */}
       {showCancel && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
-          <div style={{ background:'white', borderRadius:16, padding:32, maxWidth:380, width:'90%', boxShadow:'0 20px 60px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ fontSize:18, fontWeight:700, color:'#1F2937', margin:'0 0 8px' }}>Discard Review?</h3>
-            <p style={{ fontSize:14, color:'#6B7280', margin:'0 0 24px' }}>Are you sure? Your review will not be saved.</p>
-            <div style={{ display:'flex', gap:10 }}>
-              <button onClick={() => router.push(`/dashboard/transactions/${id}`)} style={{ flex:1, padding:'10px', borderRadius:8, background:'#EF4444', color:'white', border:'none', cursor:'pointer', fontWeight:600, fontSize:13 }}>
-                Yes, Discard
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4">
+            <h3 className="text-base font-bold text-slate-900">Discard Current Review?</h3>
+            <p className="text-xs text-slate-500">
+              Any unsaved changes or notes entered for this transaction will be cleared.
+            </p>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => router.push(`/dashboard/transactions/${id}`)}
+                className="flex-1 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors cursor-pointer"
+              >
+                Discard
               </button>
-              <button onClick={() => setShowCancel(false)} style={{ flex:1, padding:'10px', borderRadius:8, background:'#F3F4F6', color:'#374151', border:'none', cursor:'pointer', fontWeight:600, fontSize:13 }}>
-                No, Stay
+              <button
+                onClick={() => setShowCancel(false)}
+                className="flex-1 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              >
+                Keep Editing
               </button>
             </div>
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes spin { to { transform:rotate(360deg); } }
-        @keyframes bounceIn { 0%{transform:scale(0);opacity:0} 60%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
-        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
-      `}</style>
     </div>
   );
 }
